@@ -141,7 +141,7 @@
                 </select>
             </div>
             <div class="toolbar-right">
-                <button class="add-category-btn" onclick="openSidebarManagerModal()">
+                <button id="manageCategoriesBtn" class="add-category-btn" onclick="openSidebarManagerModal()">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"></path>
                         <line x1="12" y1="11" x2="12" y2="17"></line>
@@ -458,7 +458,8 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Manage Categories</h2>
-                <button id="closeSidebarManagerBtn" class="close-btn">&times;</button>
+                <!-- X back/close button -->
+                <button id="closeSidebarManagerBtn" class="close-btn" aria-label="Close">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="add-category-section">
@@ -486,6 +487,7 @@
         <div id="confirmDeleteModal" class="confirm-modal">
             <div class="modal-header">
                 <h2 class="modal-title">Confirm Deletion</h2>
+                <!-- X back/close button -->
                 <button id="closeConfirmDeleteBtn" class="close-btn" aria-label="Close">&times;</button>
             </div>
             <div class="modal-content">
@@ -494,6 +496,25 @@
             <div class="modal-actions">
                 <button type="button" class="modal-btn delete" id="confirmDeleteBtn">Delete</button>
                 <button type="button" class="modal-btn cancel" id="cancelDeleteBtn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Category Modal -->
+    <div id="editCategoryOverlay" class="modal-overlay">
+        <div id="editCategoryModal" class="confirm-modal">
+            <div class="modal-header">
+                <h2 class="modal-title">Edit Category</h2>
+                <button id="closeEditCategoryBtn" class="close-btn" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-content">
+                <label for="editCategoryName">Category Name</label>
+                <input type="text" id="editCategoryName" placeholder="Enter category name">
+                <p id="editCategoryError" style="display:none;color:#ff4d4f;margin-top:8px;"></p>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="modal-btn save" id="saveEditCategoryBtn">Save</button>
+                <button type="button" class="modal-btn cancel" id="cancelEditCategoryBtn">Cancel</button>
             </div>
         </div>
     </div>

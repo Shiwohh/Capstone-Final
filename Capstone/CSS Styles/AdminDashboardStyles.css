@@ -543,11 +543,14 @@
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
     overflow: hidden;
     /* animation removed */
+    display: flex;
+    flex-direction: column;
+    max-height: 80vh;
 }
 #confirmDeleteModal .modal-header {
     background: linear-gradient(135deg, #2c1810 0%, #1a0f0a 100%);
     color: white;
-    padding: 16px 20px;
+    padding: 20px;
     border-radius: 12px 12px 0 0;
     display: flex;
     justify-content: space-between;
@@ -560,6 +563,8 @@
     font-size: 20px;
     font-weight: 600;
     color: white;
+    text-align: center !important;
+    width: 100%;
 }
 #confirmDeleteModal .close-btn {
     background: none;
@@ -582,15 +587,69 @@
     color: rgba(255, 255, 255, 0.8);
     background: none;
 }
+/* Show X close controls for admin dashboard modals */
+#confirmDeleteModal .close-btn { display: inline-flex; }
+#sidebarManagerModal .close-btn { display: inline-flex; }
+
 #confirmDeleteModal .modal-content {
-    padding: 18px 20px;
+    padding: 20px;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    max-width: 420px;
+    width: 92%;
+    box-sizing: border-box;
+    overflow-y: auto;
+}
+#confirmDeleteMessage {
+    margin: 0;
+    line-height: 1.5;
+    width: 100%;
+    white-space: normal;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 #confirmDeleteModal .modal-actions {
-    display: flex;
-    gap: 12px;
-    justify-content: flex-end;
+    display: block;
+    text-align: center;
     padding: 16px 20px 20px 20px;
 }
+
+/* Add admin-style animations to modal buttons */
+#confirmDeleteModal .modal-btn {
+    position: relative;
+    overflow: hidden;
+    display: inline-block;
+    text-align: center;
+    vertical-align: middle;
+    gap: 6px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    min-width: 140px;
+    margin: 0 6px;
+    padding: 12px 20px;
+}
+#confirmDeleteModal .modal-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.18), transparent);
+    transition: left 0.5s ease;
+    pointer-events: none;
+}
+#confirmDeleteModal .modal-btn:hover {
+    transform: translateY(-1px);
+}
+#confirmDeleteModal .modal-btn:hover::before {
+    left: 100%;
+}
+#confirmDeleteModal .modal-btn:active {
+    transform: translateY(0);
+}
+
 #confirmDeleteModal .modal-btn.delete {
     background: linear-gradient(135deg, #540000 0%, #6d0000 100%);
     color: white;
@@ -616,13 +675,154 @@
     box-shadow: 0 6px 20px rgba(108, 117, 125, 0.4);
 }
 
-.modal-header {
+/* Edit Category Modal (styles mirror Confirm Delete Modal) */
+#editCategoryModal {
+    background: #2c1810;
+    border-radius: 12px;
+    max-width: 520px;
+    width: 95%;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    max-height: 80vh;
+}
+#editCategoryModal .modal-header {
     background: linear-gradient(135deg, #2c1810 0%, #1a0f0a 100%);
     color: white;
-    padding: 20px;
+    padding: 18px;
     border-radius: 12px 12px 0 0;
     display: flex;
     justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+#editCategoryModal .modal-title {
+    margin: 0;
+    font-family: 'Poppins', sans-serif;
+    font-size: 20px;
+    font-weight: 600;
+    color: white;
+    text-align: center !important;
+    width: 85%;
+}
+#editCategoryModal .close-btn {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 20px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: none;
+    line-height: 1;
+    padding: 0;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+#editCategoryModal .close-btn:hover {
+    color: rgba(255, 255, 255, 0.8);
+    background: none;
+}
+/* ensure X close control is visible like other admin modals */
+#editCategoryModal .close-btn { display: inline-flex; }
+
+#editCategoryModal .modal-content {
+    padding: 20px;
+    display: block;
+    max-width: 480px;
+    width: 92%;
+    box-sizing: border-box;
+}
+#editCategoryModal label {
+    display: block;
+    margin-bottom: 15px;
+    color: rgba(255, 255, 255, 0.9);
+    font-weight: 600;
+}
+#editCategoryModal input[type="text"] {
+    width: 90%;
+    padding: 15px 15px 15px 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: #1a0f0a;
+    color: #fff;
+    outline: none;
+    transition: all 0.2s ease;
+}
+#editCategoryModal input[type="text"]::placeholder { color: rgba(255, 255, 255, 0.6); }
+#editCategoryModal input[type="text"]:focus {
+    border-color: #20c997;
+    box-shadow: 0 0 0 3px rgba(32, 201, 151, 0.25);
+}
+#editCategoryError { color: #ff4d4f; }
+
+#editCategoryModal .modal-actions {
+    display: block;
+    text-align: center;
+    padding: 1px 2px 20px 2px;
+}
+#editCategoryModal .modal-btn {
+    position: relative;
+    overflow: hidden;
+    display: inline-block;
+    text-align: center;
+    vertical-align: middle;
+    gap: 6px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    min-width: 140px;
+    margin: 0 6px;
+    padding: 12px 20px;
+}
+#editCategoryModal .modal-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.18), transparent);
+    transition: left 0.5s ease;
+    pointer-events: none;
+}
+#editCategoryModal .modal-btn:hover { transform: translateY(-1px); }
+#editCategoryModal .modal-btn:hover::before { left: 100%; }
+#editCategoryModal .modal-btn:active { transform: translateY(0); }
+
+#editCategoryModal .modal-btn.save {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+    border-radius: 8px;
+    padding: 12px 20px;
+    font-weight: 600;
+    box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+}
+#editCategoryModal .modal-btn.save:hover {
+    background: linear-gradient(135deg, #218838 0%, #1e7e34 100%);
+    box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
+}
+#editCategoryModal .modal-btn.cancel {
+    background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+    color: white;
+    border-radius: 8px;
+    padding: 12px 20px;
+    font-weight: 600;
+    box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);
+}
+#editCategoryModal .modal-btn.cancel:hover {
+    background: linear-gradient(135deg, #5a6268 0%, #495057 100%);
+    box-shadow: 0 6px 20px rgba(108, 117, 125, 0.4);
+}
+
+.modal-header {
+    background: linear-gradient(135deg, #2c1810 0%, #1a0f0a 100%);
+    color: white;
+    padding: 12px 16px;
+    border-radius: 12px 12px 0 0;
+    display: flex;
+    justify-content: center;
     align-items: center;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
@@ -633,6 +833,8 @@
     font-size: 24px;
     font-weight: 600;
     color: white;
+    text-align: center;
+    width: 100%;
 }
 
 .product-modal .close-btn {
@@ -777,6 +979,13 @@
     background: transparent;
     border-top: none;
     margin: 0;
+}
+
+/* Always place cancel controls at the end (right side) in modal action rows */
+.modal-actions .cancel-btn,
+.modal-actions .modal-btn.cancel,
+.modal-actions .cancel-edit-btn {
+    order: 99;
 }
 
 .modal-btn {
@@ -1014,17 +1223,20 @@
     height: 100%;
     background-color: rgba(0, 0, 0, 0.8);
     backdrop-filter: blur(5px);
+    justify-content: center; /* center horizontally */
+    align-items: center;    /* center vertically */
 }
 
 #sidebarManagerModal .modal-content {
     position: relative;
     background: linear-gradient(135deg, #2c1810 0%, #1a0f0a 100%);
-    margin: 5% auto;
+    margin: 0 24px; /* remove vertical margins so it centers */
     padding: 0;
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 12px;
-    width: 90%;
+    width: calc(100% - 48px); /* account for left/right margins so no horizontal scroll */
     max-width: 600px;
+    max-height: 70vh; /* constrain overall modal height */
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
     animation: modalSlideIn 0.3s ease-out;
 }
@@ -1086,6 +1298,70 @@
     padding: 30px;
     max-height: 60vh;
     overflow-y: auto;
+}
+
+/* Responsive margins for floating look */
+@media (max-width: 480px) {
+    #sidebarManagerModal .modal-content {
+        margin: 0 16px; /* remove vertical margins for center on mobile */
+        width: calc(100% - 32px);
+    }
+    #sidebarManagerModal .modal-body {
+        padding: 16px; /* reduce inner padding on mobile */
+    }
+    /* Hide footer/actions entirely on mobile to remove extra space */
+    #sidebarManagerModal .modal-actions {
+        display: none !important;
+    }
+    .add-category-section, .existing-categories-section {
+        margin-bottom: 10px; /* reduce section spacing on mobile */
+    }
+    .category-item {
+        padding: 12px; /* compact list item padding on mobile */
+    }
+ 
+    /* Make Add New Product modal look like Manage Categories on mobile */
+    #productModal .product-modal {
+        margin: 8% 5px; /* side margins for floating look */
+        width: calc(100% - 32px); /* account for margins */
+        max-width: 700px; /* preserve cap */
+    }
+    #productModal .modal-content {
+        padding: 5px; /* compact inner padding */
+    }
+    /* Compact footer/actions for Add New Product on mobile (bottom inside modal) */
+    #productModal .modal-actions {
+        display: flex;
+        gap: 10px;
+        padding: 12px 16px;
+        justify-content: flex-end;
+        position: static;
+        background: transparent;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 0;
+    }
+
+    /* Ensure Confirm Delete body isn’t cut on mobile */
+    #confirmDeleteModal {
+        max-height: 80vh;
+    }
+    #confirmDeleteModal .modal-content {
+        padding: 20px;
+        width: calc(100% - 32px);
+        margin: 0 16px;
+        max-width: none;
+        overflow-y: auto;
+    }
+    #confirmDeleteModal .modal-actions {
+        padding: 12px 16px 16px 16px;
+    }
+}
+@media (min-width: 768px) {
+    #sidebarManagerModal .modal-content {
+        margin: 5% auto; /* center with auto margins on wider screens */
+        width: 90%;
+        max-width: 600px;
+    }
 }
 
 .add-category-section, .existing-categories-section {
@@ -1169,6 +1445,24 @@
 .submit-btn:active {
     transform: translateY(0);
     box-shadow: 0 2px 10px rgba(139, 105, 20, 0.3);
+}
+
+/* Responsive: make buttons more compact on small screens */
+@media (max-width: 480px) {
+    .submit-btn {
+        padding: 10px 16px;
+        height: 40px;
+        font-size: 13px;
+    }
+    .modal-btn {
+        padding: 10px 16px;
+        min-width: 110px;
+        font-size: 13px;
+    }
+    .modal-actions {
+        gap: 12px;
+        padding: 16px 20px;
+    }
 }
 
 .category-item {

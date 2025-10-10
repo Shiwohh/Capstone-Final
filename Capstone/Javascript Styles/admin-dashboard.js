@@ -242,7 +242,7 @@ function renderProducts() {
                         Delete
                     </button>
                     <button class="admin-btn toggle-visibility-btn ${product.visible ? '' : 'hidden'}" 
-                            onclick="toggleProductVisibility('${product.id}', ${product.visible})">
+                            onclick="toggleProductVisibility('${product.id}', ${product.visible}, '${escapeHtml(product.title)}')">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             ${product.visible ? 
                                 '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>' :
@@ -326,9 +326,12 @@ async function editProduct(productId) {
         clearAllGlbFiles(); // Clear any existing .glb files first
         
         if (product.glbFiles && Array.isArray(product.glbFiles)) {
-            // Load multiple .glb files from array
+            // Load multiple .glb files from array; support both saved shapes (url/src)
             product.glbFiles.forEach((glbFile, index) => {
-                addGlbFileToPreview(glbFile.src, glbFile.name || `GLB Model ${index + 1}`);
+                const source = (glbFile && (glbFile.url || glbFile.src)) || '';
+                if (typeof source === 'string' && source.trim()) {
+                    addGlbFileToPreview(source, glbFile.name || `GLB Model ${index + 1}`);
+                }
             });
         }
         
@@ -390,16 +393,32 @@ function normalizeExternalUrl(url) {
 // Handle product form submission
 async function handleProductSubmit(event) {
     event.preventDefault();
+    // Surface current auth state for clearer diagnostics
+    try {
+        const firebaseUser = firebase.auth && firebase.auth().currentUser;
+        if (!firebaseUser) {
+            console.warn('No Firebase user is authenticated. Writes may be blocked by database rules.');
+        }
+    } catch (e) {
+        console.warn('Unable to read Firebase auth state:', e);
+    }
     
     // Get images from the productImages array
     const images = productImages.map(img => img.src);
     
     // Get .glb files from the productGlbFiles array
-    const glbFiles = productGlbFiles.map(glb => ({
-        url: typeof glb.src === 'string' ? normalizeExternalUrl(glb.src) : glb.src,
-        name: glb.name,
-        size: glb.size
-    }));
+    // Only persist real URLs (skip temporary blob: URLs from local File previews)
+    const glbFiles = productGlbFiles
+        .map(glb => {
+            const rawUrl = typeof glb.src === 'string' ? glb.src : '';
+            const normalizedUrl = normalizeExternalUrl(rawUrl);
+            return {
+                url: normalizedUrl,
+                name: glb.name,
+                size: glb.size
+            };
+        })
+        .filter(glb => typeof glb.url === 'string' && glb.url.trim() && !glb.url.startsWith('blob:'));
     
     // Debug logging
     console.log('Product Images Array:', productImages);
@@ -446,39 +465,154 @@ async function handleProductSubmit(event) {
         closeProductModal();
     } catch (error) {
         console.error('Error saving product:', error);
-        showNotification('Error saving product', 'error');
+        const msg = (error && (error.message || error.code)) ? (error.message || error.code) : '';
+        if (msg) {
+            showNotification(`Error saving product: ${msg}`, 'error');
+        } else {
+            showNotification('Error saving product', 'error');
+        }
+        if (msg && /PERMISSION_DENIED|permission|auth/i.test(msg)) {
+            showNotification('Please log in with your Firebase admin account and retry.', 'error');
+        }
     }
 }
 
-// Delete product
+// Delete product (uses custom confirmation modal)
 async function deleteProduct(productId, productTitle) {
-    if (!confirm(`Are you sure you want to delete "${productTitle}"? This action cannot be undone.`)) {
+    // Get modal elements
+    const overlay = document.getElementById('confirmDeleteOverlay');
+    const messageEl = document.getElementById('confirmDeleteMessage');
+    const confirmBtn = document.getElementById('confirmDeleteBtn');
+    const cancelBtn = document.getElementById('cancelDeleteBtn');
+    const closeBtn = document.getElementById('closeConfirmDeleteBtn');
+
+    // Fallback to native confirm if modal elements are missing
+    if (!overlay || !messageEl || !confirmBtn || !cancelBtn || !closeBtn) {
+        if (!confirm(`Are you sure you want to delete "${productTitle}"? This action cannot be undone.`)) return;
+        try {
+            await deleteProductFromFirebase(productId);
+            showNotification('Product deleted successfully', 'success');
+        } catch (error) {
+            console.error('Error deleting product:', error);
+            showNotification('Error deleting product', 'error');
+        }
         return;
     }
-    
-    try {
-        await deleteProductFromFirebase(productId);
-        showNotification('Product deleted successfully', 'success');
-    } catch (error) {
-        console.error('Error deleting product:', error);
-        showNotification('Error deleting product', 'error');
-    }
+
+    // Configure message and show modal
+    messageEl.textContent = `Are you sure you want to delete "${productTitle}"? This action cannot be undone.`;
+    overlay.classList.add('active');
+
+    // Helper to close modal and clean handlers
+    const cleanupAndClose = () => {
+        overlay.classList.remove('active');
+        confirmBtn.onclick = null;
+        cancelBtn.onclick = null;
+        closeBtn.onclick = null;
+        overlay.onclick = null;
+    };
+
+    // Click-outside closes modal
+    overlay.onclick = function (event) {
+        if (event.target === overlay) cleanupAndClose();
+    };
+
+    // Cancel/x handlers
+    cancelBtn.onclick = cleanupAndClose;
+    closeBtn.onclick = cleanupAndClose;
+
+    // Confirm deletion
+    confirmBtn.onclick = async function () {
+        try {
+            await deleteProductFromFirebase(productId);
+            showNotification('Product deleted successfully', 'success');
+            // Re-render products list after deletion
+            await loadProducts();
+        } catch (error) {
+            console.error('Error deleting product:', error);
+            showNotification('Error deleting product', 'error');
+        }
+        cleanupAndClose();
+    };
 }
 
 // Toggle product visibility
-async function toggleProductVisibility(productId, currentVisibility) {
+async function toggleProductVisibility(productId, currentVisibility, productTitle) {
     try {
-        const product = await getProductById(productId);
-        if (!product) {
-            showNotification('Product not found', 'error');
+        const actionText = currentVisibility ? 'Hide' : 'Show';
+
+        // Try to use the custom confirm delete modal
+        const overlay = document.getElementById('confirmDeleteOverlay');
+        const messageEl = document.getElementById('confirmDeleteMessage');
+        const confirmBtn = document.getElementById('confirmDeleteBtn');
+        const cancelBtn = document.getElementById('cancelDeleteBtn');
+        const closeBtn = document.getElementById('closeConfirmDeleteBtn');
+        const titleEl = document.querySelector('#confirmDeleteModal .modal-title');
+
+        // Fallback to native confirm if modal elements are missing
+        if (!overlay || !messageEl || !confirmBtn || !cancelBtn || !closeBtn) {
+            const proceed = confirm(`Are you sure you want to ${actionText.toLowerCase()} "${productTitle}"?`);
+            if (!proceed) return;
+
+            // Fetch only when confirmed
+            const product = await getProductById(productId);
+            if (!product) { showNotification('Product not found', 'error'); return; }
+            product.visible = !currentVisibility;
+            product.updatedAt = new Date().toISOString();
+
+            await saveProductToFirebase(product);
+            showNotification(`Product ${product.visible ? 'shown' : 'hidden'} successfully`, 'success');
+            // Refresh list to reflect the change immediately
+            await loadProducts();
             return;
         }
-        
-        product.visible = !currentVisibility;
-        product.updatedAt = new Date().toISOString();
-        
-        await saveProductToFirebase(product);
-        showNotification(`Product ${product.visible ? 'shown' : 'hidden'} successfully`, 'success');
+
+        // Configure message and show modal
+        const originalConfirmText = confirmBtn.textContent;
+        const originalTitleText = titleEl ? titleEl.textContent : null;
+        messageEl.textContent = `Are you sure you want to ${actionText.toLowerCase()} "${productTitle}"?`;
+        confirmBtn.textContent = actionText;
+        if (titleEl) titleEl.textContent = `Confirm ${actionText}`;
+        overlay.classList.add('active');
+
+        // Helper to close modal and clean handlers (and restore button text)
+        const cleanupAndClose = () => {
+            overlay.classList.remove('active');
+            confirmBtn.onclick = null;
+            cancelBtn.onclick = null;
+            closeBtn.onclick = null;
+            overlay.onclick = null;
+            confirmBtn.textContent = originalConfirmText;
+            if (titleEl && originalTitleText) titleEl.textContent = originalTitleText;
+        };
+
+        // Click-outside closes modal
+        overlay.onclick = function (event) {
+            if (event.target === overlay) cleanupAndClose();
+        };
+
+        // Cancel/x handlers
+        cancelBtn.onclick = cleanupAndClose;
+        closeBtn.onclick = cleanupAndClose;
+
+        // Confirm visibility toggle
+        confirmBtn.onclick = async function () {
+            try {
+                // Fetch the product only after confirmation
+                const product = await getProductById(productId);
+                if (!product) { showNotification('Product not found', 'error'); cleanupAndClose(); return; }
+                product.visible = !currentVisibility;
+                product.updatedAt = new Date().toISOString();
+                await saveProductToFirebase(product);
+                showNotification(`Product ${product.visible ? 'shown' : 'hidden'} successfully`, 'success');
+                // Refresh list to reflect the change immediately
+                await loadProducts();
+            } catch (error) {
+                console.error('Error updating product visibility:', error);
+                showNotification('Error updating product visibility', 'error');
+            }
+            cleanupAndClose();
+        };
     } catch (error) {
         console.error('Error toggling product visibility:', error);
         showNotification('Error updating product visibility', 'error');
@@ -711,7 +845,7 @@ function setupSidebarManagement() {
         manageCategoriesBtn.addEventListener('click', openSidebarManagerModal);
         console.log('Manage Categories button event listener added');
     } else {
-        console.error('manageCategoriesBtn not found');
+        console.warn('manageCategoriesBtn not found');
     }
     
     // Close modal button
@@ -720,7 +854,7 @@ function setupSidebarManagement() {
         closeSidebarManagerBtn.addEventListener('click', closeSidebarManagerModal);
         console.log('Close sidebar manager button event listener added');
     } else {
-        console.error('closeSidebarManagerBtn not found');
+        console.warn('closeSidebarManagerBtn not found');
     }
     
     // Close modal when clicking outside
@@ -733,7 +867,7 @@ function setupSidebarManagement() {
         });
         console.log('Modal outside click event listener added');
     } else {
-        console.error('sidebarManagerModal not found');
+        console.warn('sidebarManagerModal not found');
     }
 }
 
@@ -1000,7 +1134,17 @@ function renderExistingCategories() {
 // Edit category (placeholder for future enhancement)
 async function editCategory(categoryId) {
     const category = sidebarCategories.find(cat => cat.id === categoryId);
-    if (category) {
+    if (!category) return;
+
+    const overlay = document.getElementById('editCategoryOverlay');
+    const input = document.getElementById('editCategoryName');
+    const saveBtn = document.getElementById('saveEditCategoryBtn');
+    const cancelBtn = document.getElementById('cancelEditCategoryBtn');
+    const closeBtn = document.getElementById('closeEditCategoryBtn');
+    const errorEl = document.getElementById('editCategoryError');
+
+    // Fallback to native prompt if modal elements are missing
+    if (!overlay || !input || !saveBtn || !cancelBtn || !closeBtn || !errorEl) {
         const newName = prompt('Enter new category name:', category.name);
         if (newName && newName.trim() && newName.trim() !== category.name) {
             const normalizedName = newName.trim().toLowerCase();
@@ -1012,41 +1156,119 @@ async function editCategory(categoryId) {
             category.id = newId;
 
             try {
-                // Save under the new deterministic id
                 await saveCategoryToFirebase(category);
-
-                // Cleanup duplicates with same normalized name and remove old id if changed
-                try {
-                    await firebaseServices.cleanupDuplicateCategories(newId, normalizedName);
-                } catch (cleanupErr) {
-                    console.warn('Failed to cleanup duplicates after edit:', cleanupErr);
-                }
+                try { await firebaseServices.cleanupDuplicateCategories(newId, normalizedName); } catch (cleanupErr) { console.warn('Failed to cleanup duplicates after edit:', cleanupErr); }
                 if (newId !== oldId) {
-                    try {
-                        await deleteCategoryFromFirebase(oldId);
-                    } catch (delErr) {
-                        console.warn('Failed to delete old category id after edit:', delErr);
-                    }
+                    try { await deleteCategoryFromFirebase(oldId); } catch (delErr) { console.warn('Failed to delete old category id after edit:', delErr); }
                 }
-
-                // Persist and re-render with a deduplicated snapshot
                 sidebarCategories = uniqueCategoriesByName(sidebarCategories);
                 localStorage.setItem('sidebarCategories', JSON.stringify(sidebarCategories));
                 renderSidebar();
                 renderExistingCategories();
-                showNotification(`Category updated successfully!`, 'success');
+                populateCategoryDropdowns();
+                showNotification('Category updated successfully!', 'success');
             } catch (error) {
                 console.error('Error updating category in Firebase:', error);
                 alert('Failed to update category. Please try again.');
             }
         }
+        return;
     }
+
+    // Configure and show modal
+    input.value = category.name;
+    errorEl.style.display = 'none';
+    errorEl.textContent = '';
+    overlay.classList.add('active');
+
+    const cleanupAndClose = () => {
+        overlay.classList.remove('active');
+        saveBtn.onclick = null;
+        cancelBtn.onclick = null;
+        closeBtn.onclick = null;
+        overlay.onclick = null;
+    };
+
+    // Close modal when clicking outside content
+    overlay.onclick = function (event) {
+        if (event.target === overlay) {
+            cleanupAndClose();
+        }
+    };
+
+    // Cancel/close handlers
+    cancelBtn.onclick = cleanupAndClose;
+    closeBtn.onclick = cleanupAndClose;
+
+    // Save handler
+    saveBtn.onclick = async function () {
+        const newName = (input.value || '').trim();
+        if (!newName) {
+            errorEl.textContent = 'Please enter a category name.';
+            errorEl.style.display = 'block';
+            return;
+        }
+
+        if (newName === category.name) {
+            cleanupAndClose();
+            return;
+        }
+
+        const normalizedName = newName.toLowerCase();
+
+        // Prevent naming conflict with another category
+        const conflict = sidebarCategories.some(c => ((c.name || '').trim().toLowerCase() === normalizedName) && c.id !== category.id);
+        if (conflict) {
+            errorEl.textContent = 'A category with this name already exists.';
+            errorEl.style.display = 'block';
+            return;
+        }
+
+        const oldId = category.id;
+        const newId = generateCategoryId(newName);
+
+        // Update local object
+        category.name = newName;
+        category.id = newId;
+
+        try {
+            await saveCategoryToFirebase(category);
+            try { await firebaseServices.cleanupDuplicateCategories(newId, normalizedName); } catch (cleanupErr) { console.warn('Failed to cleanup duplicates after edit:', cleanupErr); }
+            if (newId !== oldId) {
+                try { await deleteCategoryFromFirebase(oldId); } catch (delErr) { console.warn('Failed to delete old category id after edit:', delErr); }
+            }
+
+            // Persist and re-render with a deduplicated snapshot
+            sidebarCategories = uniqueCategoriesByName(sidebarCategories);
+            localStorage.setItem('sidebarCategories', JSON.stringify(sidebarCategories));
+            renderSidebar();
+            renderExistingCategories();
+            populateCategoryDropdowns();
+            showNotification('Category updated successfully!', 'success');
+            cleanupAndClose();
+        } catch (error) {
+            console.error('Error updating category in Firebase:', error);
+            errorEl.textContent = 'Failed to update category. Please try again.';
+            errorEl.style.display = 'block';
+        }
+    };
 }
 
-// Delete category
+// Delete category (uses custom confirmation modal instead of native confirm)
 async function deleteCategory(categoryId) {
     const category = sidebarCategories.find(cat => cat.id === categoryId);
-    if (category && confirm(`Are you sure you want to delete "${category.name}"?`)) {
+    if (!category) return;
+
+    // Try to use the custom confirm delete modal
+    const overlay = document.getElementById('confirmDeleteOverlay');
+    const messageEl = document.getElementById('confirmDeleteMessage');
+    const confirmBtn = document.getElementById('confirmDeleteBtn');
+    const cancelBtn = document.getElementById('cancelDeleteBtn');
+    const closeBtn = document.getElementById('closeConfirmDeleteBtn');
+
+    // Fallback to native confirm if modal elements are missing
+    if (!overlay || !messageEl || !confirmBtn || !cancelBtn || !closeBtn) {
+        if (!confirm(`Are you sure you want to delete "${category.name}"?`)) return;
         try {
             await deleteCategoryFromFirebase(categoryId);
         } catch (error) {
@@ -1054,22 +1276,70 @@ async function deleteCategory(categoryId) {
             alert('Failed to delete category. Please try again.');
             return;
         }
-
-        // Update local cache/UI after successful deletion
         sidebarCategories = sidebarCategories.filter(cat => cat.id !== categoryId);
         localStorage.setItem('sidebarCategories', JSON.stringify(sidebarCategories));
-        
-        // If currently viewing this category, switch to all products
         if (currentCategory === categoryId) {
             filterByCategory('all');
         } else {
             renderSidebar();
         }
-        
+        renderExistingCategories();
+        populateCategoryDropdowns();
+        showNotification(`Category "${category.name}" deleted successfully!`, 'success');
+        return;
+    }
+
+    // Configure and show the modal
+    messageEl.textContent = `Are you sure you want to delete "${category.name}"?`;
+    overlay.classList.add('active');
+
+    // Helper to close modal and clean handlers
+    const cleanupAndClose = () => {
+        overlay.classList.remove('active');
+        confirmBtn.onclick = null;
+        cancelBtn.onclick = null;
+        closeBtn.onclick = null;
+        overlay.onclick = null;
+    };
+
+    // Close modal when clicking outside content
+    overlay.onclick = function (event) {
+        if (event.target === overlay) {
+            cleanupAndClose();
+        }
+    };
+
+    // Cancel/close handlers
+    cancelBtn.onclick = cleanupAndClose;
+    closeBtn.onclick = cleanupAndClose;
+
+    // Confirm deletion handler
+    confirmBtn.onclick = async function () {
+        try {
+            await deleteCategoryFromFirebase(categoryId);
+        } catch (error) {
+            console.error('Error deleting category from Firebase:', error);
+            alert('Failed to delete category. Please try again.');
+            cleanupAndClose();
+            return;
+        }
+
+        // Update local cache/UI after successful deletion
+        sidebarCategories = sidebarCategories.filter(cat => cat.id !== categoryId);
+        localStorage.setItem('sidebarCategories', JSON.stringify(sidebarCategories));
+
+        // If currently viewing this category, switch to all products
+        if (typeof currentCategory !== 'undefined' && currentCategory === categoryId) {
+            filterByCategory('all');
+        } else {
+            renderSidebar();
+        }
+
         renderExistingCategories();
         populateCategoryDropdowns(); // Refresh dropdowns after deletion
         showNotification(`Category "${category.name}" deleted successfully!`, 'success');
-    }
+        cleanupAndClose();
+    };
 }
 
 // Multiple Image Management Functions
