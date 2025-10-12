@@ -32,6 +32,7 @@ export default defineConfig(({ command, mode }) => {
       outDir: 'dist',
       assetsDir: 'assets',
       sourcemap: false,
+      cssCodeSplit: false, // Keep CSS in single file for consistency
       rollupOptions: {
         input: {
           main: 'index.html',
@@ -42,6 +43,15 @@ export default defineConfig(({ command, mode }) => {
           preorder: 'preorder.html',
           preorders: 'preorders.html',
           'preorder-confirmation': 'preorder-confirmation.html'
+        },
+        output: {
+          assetFileNames: (assetInfo) => {
+            // Keep CSS files with predictable names
+            if (assetInfo.name && assetInfo.name.endsWith('.css')) {
+              return 'assets/[name]-[hash][extname]';
+            }
+            return 'assets/[name]-[hash][extname]';
+          }
         }
       }
     },
