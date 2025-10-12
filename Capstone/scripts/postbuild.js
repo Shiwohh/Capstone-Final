@@ -1,5 +1,4 @@
 // Post-build copy: ensure non-module scripts are shipped to dist
-// Enhanced for Netlify compatibility
 import { promises as fs } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -21,6 +20,7 @@ async function copyDir(srcDir, destDir) {
   }
 }
 
+<<<<<<< HEAD
 async function ensureCssConsistency() {
   const projectRoot = path.resolve(__dirname, '..');
   const srcCssDir = path.join(projectRoot, 'CSS Styles');
@@ -146,15 +146,16 @@ async function fixJavaScriptPaths() {
   }
 }
 
+=======
+>>>>>>> 136f2a1782a5a57c9d23819bb28c350a9e8bbf2c
 async function main() {
   const projectRoot = path.resolve(__dirname, '..');
   const src = path.join(projectRoot, 'Javascript Styles');
   const dest = path.join(projectRoot, 'dist', 'Javascript Styles');
-  
   try {
-    // Copy JavaScript files
     await copyDir(src, dest);
     console.log(`[postbuild] Copied "${src}" -> "${dest}"`);
+<<<<<<< HEAD
     
     // Ensure CSS consistency
     await ensureCssConsistency();
@@ -163,8 +164,10 @@ async function main() {
     await fixJavaScriptPaths();
     
     console.log('[postbuild] All post-build tasks completed successfully');
+=======
+>>>>>>> 136f2a1782a5a57c9d23819bb28c350a9e8bbf2c
   } catch (err) {
-    console.error('[postbuild] Process failed:', err?.message || err);
+    console.error('[postbuild] Copy failed:', err?.message || err);
     process.exitCode = 1;
   }
 }
